@@ -1,3 +1,11 @@
 <resources>
-    <string name="app_name">FortuneCookie</string>
+    <string name="app_name">CookieApp</string>
+    <string name="share_subject">Frase de la galeta</string>
+    <string-array name="cookie_phrases">
+        <item>Avui serà un gran dia.</item>
+        <item>No oblidis somriure.</item>
+        <item>La paciència porta recompensa.</item>
+        <item>Aprèn alguna cosa nova avui.</item>
+        <item>Comparteix alegria.</item>
+    </string-array>
 </resources>

@@ -45,4 +45,8 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    implementation("com.google.android.material:material:<latest>")
+    implementation("com.google.firebase:firebase-analytics-ktx:<latest>")
+    implementation("com.google.firebase:firebase-auth-ktx:<latest>")
+    implementation("com.google.android.gms:play-services-ads:<latest>")
 }
