@@ -4,57 +4,96 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.view.View
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
-import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
 import kotlin.random.Random
+import android.media.MediaPlayer
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.Build
 
+class MainActivity : AppCompatActivity() {
 
-class CookieActivity : AppCompatActivity() {
-
-
-    private lateinit var imageCookie: ImageView
-    private lateinit var textPhrase: TextView
-    private lateinit var btnShare: ImageButton
-    private lateinit var btnCopy: ImageButton
-    private lateinit var btnReload: ImageButton
-    private lateinit var phrases: Array<String>
-    private var currentPhrase: String = ""
-
+    private lateinit var frases: Array<String>
+    private lateinit var mp: MediaPlayer
+    private lateinit var vibrator: Vibrator
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_cookie)
+        setContentView(R.layout.activity_main)
 
+        // Cargar array de frases desde strings.xml
+        frases = resources.getStringArray(R.array.frases_cookie)
 
-// Inicialització de vistes
-        imageCookie = findViewById(R.id.imageCookie)
-        textPhrase = findViewById(R.id.textPhrase)
-        btnShare = findViewById(R.id.btnShare)
-        btnCopy = findViewById(R.id.btnCopy)
-        btnReload = findViewById(R.id.btnReload)
+        // Inicializar sonido y vibración
+        mp = MediaPlayer.create(this, R.raw.cookie)
+        vibrator = getSystemService(Vibrator::class.java)
 
+        // Referencias de vistas
+        val imgCookie = findViewById<ImageView>(R.id.imgCookie)
+        val txtFrase = findViewById<TextView>(R.id.txtFrase)
+        val btnReload = findViewById<ImageButton>(R.id.btnReload)
+        val btnCopy = findViewById<ImageButton>(R.id.btnCopy)
+        val btnShare = findViewById<ImageButton>(R.id.btnShare)
 
-// Llegim l'array de frases des de resources
-        phrases = resources.getStringArray(R.array.cookie_phrases)
+        // Asignar iconos públicos de Android a los botones
+        btnReload.setImageResource(android.R.drawable.ic_menu_rotate)
+        btnCopy.setImageResource(android.R.drawable.ic_menu_agenda)
+        btnShare.setImageResource(android.R.drawable.ic_menu_send)
 
-
-// Quan toquem la imatge s'obté i mostra una frase aleatòria
-        imageCookie.setOnClickListener {
-            showRandomPhrase()
+        // Función para mostrar una frase aleatoria
+        fun mostrarFraseAleatoria() {
+            txtFrase.text = frases[Random.nextInt(frases.size)]
         }
 
+        // Tocar galleta → sonido + vibración + frase
+        imgCookie.setOnClickListener {
 
-// Botó per obtenir una altra frase
+            // Sonido
+            mp.start()
+
+            // Vibración corta (100 ms) compatible con API 24+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(
+                    VibrationEffect.createOneShot(
+                        100,
+                        VibrationEffect.DEFAULT_AMPLITUDE
+                    )
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(100)
+            }
+
+            mostrarFraseAleatoria()
+        }
+
+        // Botón recargar → nueva frase
         btnReload.setOnClickListener {
-            showRandomPhrase()
+            mostrarFraseAleatoria()
         }
 
-
-// Copiar al porta-retalls
+        // Botón copiar → portapapeles
         btnCopy.setOnClickListener {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = ClipData.newPlainText("frase", txtFrase.text.toString())
+            clipboard.setPrimaryClip(clip)
         }
+
+        // Botón compartir → Intent
+        btnShare.setOnClickListener {
+            val intent = Intent(Intent.ACTION_SEND)
+            intent.type = "text/plain"
+            intent.putExtra(Intent.EXTRA_TEXT, txtFrase.text.toString())
+            startActivity(Intent.createChooser(intent, "Compartir frase"))
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        mp.release()
+    }
+}

@@ -1,11 +1,11 @@
 <resources>
     <string name="app_name">CookieApp</string>
-    <string name="share_subject">Frase de la galeta</string>
-    <string-array name="cookie_phrases">
+
+    <string-array name="frases_cookie">
+        <item>La vida és plena de sorpreses agradables.</item>
+        <item>Creu en tu mateix i tot serà possible.</item>
         <item>Avui serà un gran dia.</item>
-        <item>No oblidis somriure.</item>
-        <item>La paciència porta recompensa.</item>
-        <item>Aprèn alguna cosa nova avui.</item>
-        <item>Comparteix alegria.</item>
+        <item>La sort acompanya els valents.</item>
+        <item>Una oportunitat inesperada està a punt d’arribar.</item>
     </string-array>
 </resources>
