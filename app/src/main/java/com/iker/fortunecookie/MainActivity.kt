@@ -4,96 +4,127 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.Log
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
-import kotlin.random.Random
-import android.media.MediaPlayer
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.Build
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import com.google.firebase.analytics.FirebaseAnalytics
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.ktx.Firebase
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var frases: Array<String>
-    private lateinit var mp: MediaPlayer
-    private lateinit var vibrator: Vibrator
+    private lateinit var auth: FirebaseAuth
+    private lateinit var analytics: FirebaseAnalytics
+
+    private lateinit var imgCookie: ImageView
+    private lateinit var txtFrase: TextView
+    private lateinit var btnReload: ImageButton
+    private lateinit var btnCopy: ImageButton
+    private lateinit var btnShare: ImageButton
+
+    private var currentPhrase: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Cargar array de frases desde strings.xml
-        frases = resources.getStringArray(R.array.frases_cookie)
+        // Firebase initialization
+        auth = Firebase.auth
+        analytics = FirebaseAnalytics.getInstance(this)
 
-        // Inicializar sonido y vibración
-        mp = MediaPlayer.create(this, R.raw.cookie)
-        vibrator = getSystemService(Vibrator::class.java)
+        // Anonymous sign-in
+        signInAnonymously()
 
-        // Referencias de vistas
-        val imgCookie = findViewById<ImageView>(R.id.imgCookie)
-        val txtFrase = findViewById<TextView>(R.id.txtFrase)
-        val btnReload = findViewById<ImageButton>(R.id.btnReload)
-        val btnCopy = findViewById<ImageButton>(R.id.btnCopy)
-        val btnShare = findViewById<ImageButton>(R.id.btnShare)
+        // Initialize UI elements - MUST MATCH XML IDs
+        imgCookie = findViewById(R.id.imgCookie)
+        txtFrase = findViewById(R.id.txtFrase)  // Changed from tvPhrase
+        btnReload = findViewById(R.id.btnReload)
+        btnCopy = findViewById(R.id.btnCopy)
+        btnShare = findViewById(R.id.btnShare)  // Changed from btnShare
 
-        // Asignar iconos públicos de Android a los botones
-        btnReload.setImageResource(android.R.drawable.ic_menu_rotate)
-        btnCopy.setImageResource(android.R.drawable.ic_menu_agenda)
-        btnShare.setImageResource(android.R.drawable.ic_menu_send)
+        // Set click listeners
+        imgCookie.setOnClickListener { showNewPhrase() }
+        btnReload.setOnClickListener { showNewPhrase() }
+        btnCopy.setOnClickListener { copyPhrase() }
+        btnShare.setOnClickListener { sharePhrase() }
 
-        // Función para mostrar una frase aleatoria
-        fun mostrarFraseAleatoria() {
-            txtFrase.text = frases[Random.nextInt(frases.size)]
-        }
+        // Show initial phrase
+        showNewPhrase()
+    }
 
-        // Tocar galleta → sonido + vibración + frase
-        imgCookie.setOnClickListener {
-
-            // Sonido
-            mp.start()
-
-            // Vibración corta (100 ms) compatible con API 24+
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator.vibrate(
-                    VibrationEffect.createOneShot(
-                        100,
-                        VibrationEffect.DEFAULT_AMPLITUDE
-                    )
-                )
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(100)
+    private fun signInAnonymously() {
+        if (auth.currentUser == null) {
+            auth.signInAnonymously().addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val uid = auth.currentUser?.uid
+                    Log.d("AUTH", "Anonymous UID: $uid")
+                } else {
+                    Log.e("AUTH", "Anonymous sign-in failed", task.exception)
+                }
             }
-
-            mostrarFraseAleatoria()
-        }
-
-        // Botón recargar → nueva frase
-        btnReload.setOnClickListener {
-            mostrarFraseAleatoria()
-        }
-
-        // Botón copiar → portapapeles
-        btnCopy.setOnClickListener {
-            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clip = ClipData.newPlainText("frase", txtFrase.text.toString())
-            clipboard.setPrimaryClip(clip)
-        }
-
-        // Botón compartir → Intent
-        btnShare.setOnClickListener {
-            val intent = Intent(Intent.ACTION_SEND)
-            intent.type = "text/plain"
-            intent.putExtra(Intent.EXTRA_TEXT, txtFrase.text.toString())
-            startActivity(Intent.createChooser(intent, "Compartir frase"))
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        mp.release()
+    private fun showNewPhrase() {
+        currentPhrase = getRandomPhrase()
+        txtFrase.text = currentPhrase  // Changed from tvPhrase to txtFrase
+
+        // Firebase Analytics event
+        val bundle = Bundle()
+        bundle.putString("phrase", currentPhrase)
+        analytics.logEvent("open_cookie", bundle)
+
+        Toast.makeText(this, "Nueva frase generada!", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun getRandomPhrase(): String {
+        val phrases = listOf(
+            "Hoy es un buen día para aprender algo nuevo.",
+            "La paciencia es la clave del éxito.",
+            "Confía en el proceso.",
+            "Cada paso cuenta.",
+            "El esfuerzo trae recompensa.",
+            "La suerte favorece a los valientes.",
+            "Un viaje de mil millas comienza con un solo paso.",
+            "El conocimiento es poder.",
+            "La sonrisa es el idioma universal de los inteligentes.",
+            "Haz de cada día tu obra maestra."
+        )
+        return phrases.random()
+    }
+
+    private fun sharePhrase() {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, "🍪 Mi frase de la fortuna: $currentPhrase")
+        }
+        startActivity(Intent.createChooser(intent, "Compartir frase"))
+
+        // Firebase Analytics event
+        val bundle = Bundle()
+        bundle.putString(FirebaseAnalytics.Param.METHOD, "share")
+        bundle.putString("phrase", currentPhrase)
+        analytics.logEvent("share_phrase", bundle)
+
+        Toast.makeText(this, "Frase compartida ✓", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun copyPhrase() {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText("Frase de la fortuna", currentPhrase)
+        clipboard.setPrimaryClip(clip)
+
+        // Firebase Analytics event
+        val bundle = Bundle()
+        bundle.putString(FirebaseAnalytics.Param.METHOD, "copy")
+        bundle.putString("phrase", currentPhrase)
+        analytics.logEvent("copy_phrase", bundle)
+
+        Toast.makeText(this, "Frase copiada al portapapeles 📋", Toast.LENGTH_SHORT).show()
     }
 }
