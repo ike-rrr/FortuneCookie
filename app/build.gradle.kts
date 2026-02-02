@@ -50,12 +50,10 @@ dependencies {
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
 
-    // Firebase BOM (manages versions)
+    // Firebase BOM
     implementation(platform(libs.firebase.bom))
-
-    // Firebase dependencies - ADD BOTH VERSIONS
-    implementation(libs.firebase.auth)           // Non-KTX version (for FirebaseAuth class imports)
-    implementation(libs.firebase.auth.ktx)       // KTX version (for extensions)
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.auth.ktx)
     implementation(libs.firebase.analytics.ktx)
 
     // Testing
