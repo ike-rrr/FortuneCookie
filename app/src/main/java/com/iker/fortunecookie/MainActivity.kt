@@ -11,9 +11,14 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.analytics.ktx.analytics
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 import com.iker.fortunecookie.databinding.ActivityMainBinding
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.LoadAdError
+import com.google.android.gms.ads.MobileAds
+import com.google.android.gms.ads.FullScreenContentCallback
+import com.google.android.gms.ads.rewarded.RewardedAd
+import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 
 class MainActivity : AppCompatActivity() {
 
@@ -23,42 +28,99 @@ class MainActivity : AppCompatActivity() {
     private var currentPhrase: String = ""
     private var userId: String? = null
 
+    // VARIABLES ADMOB
+    private var rewardedAd: RewardedAd? = null
+    private val TAG = "AdMob"
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Initialize Firebase instances (EXACTLY as per requirements)
         auth = FirebaseAuth.getInstance()
         analytics = Firebase.analytics
 
-        // Anonymous sign-in (EXACTLY as per requirements)
         signInAnonymously()
 
-        // Set click listeners
+        // Inicializar AdMob
+        MobileAds.initialize(this) {}
+        loadRewardedAd()
+
         binding.imgCookie.setOnClickListener {
             showNewPhrase()
             logEvent("cookie_tap", "Tocado galleta para nueva frase")
         }
 
+        // MODIFICADO → Ahora muestra anuncio antes de recargar
         binding.btnReload.setOnClickListener {
-            showNewPhrase()
-            logEvent("reload_phrase", "Recargar para ver otra frase") // Event d)
+
+            rewardedAd?.let { ad ->
+
+                ad.show(this) {
+                    Log.d(TAG, "User earned reward.")
+                    showNewPhrase()
+                }
+
+            } ?: run {
+
+                Log.d(TAG, "Ad not ready.")
+                showNewPhrase()
+                loadRewardedAd()
+            }
         }
 
         binding.btnCopy.setOnClickListener {
             copyPhrase()
-            logEvent("copy_phrase", "Copiar frase al portapapeles") // Event c)
+            logEvent("copy_phrase", "Copiar frase al portapapeles")
         }
 
         binding.btnShare.setOnClickListener {
             sharePhrase()
-            logEvent("share_phrase", "Compartir frase") // Event b)
+            logEvent("share_phrase", "Compartir frase")
         }
 
-        // Show initial phrase
         showNewPhrase()
+    }
+
+    // FUNCIÓN CARGA ANUNCIO
+    private fun loadRewardedAd() {
+
+        val adRequest = AdRequest.Builder().build()
+
+        RewardedAd.load(
+            this,
+            "ca-app-pub-3940256099942544/5224354917",
+            adRequest,
+            object : RewardedAdLoadCallback() {
+
+                override fun onAdFailedToLoad(adError: LoadAdError) {
+                    Log.d(TAG, adError.toString())
+                    rewardedAd = null
+                }
+
+                override fun onAdLoaded(ad: RewardedAd) {
+                    Log.d(TAG, "Ad was loaded.")
+                    rewardedAd = ad
+
+                    rewardedAd?.fullScreenContentCallback =
+                        object : FullScreenContentCallback() {
+
+                            override fun onAdDismissedFullScreenContent() {
+                                Log.d(TAG, "Ad dismissed.")
+                                rewardedAd = null
+                                loadRewardedAd() // 🔁 Pre-carga automática
+                            }
+
+                            override fun onAdFailedToShowFullScreenContent(adError: com.google.android.gms.ads.AdError) {
+                                Log.d(TAG, "Ad failed to show.")
+                                rewardedAd = null
+                                loadRewardedAd()
+                            }
+                        }
+                }
+            }
+        )
     }
 
     private fun signInAnonymously() {
@@ -70,7 +132,6 @@ class MainActivity : AppCompatActivity() {
                         userId = user?.uid
                         Log.d("FIREBASE_AUTH", "Anonymous sign-in successful. UID: $userId")
 
-                        // Optional: Store UID in analytics user properties
                         val bundle = Bundle()
                         bundle.putString("user_id", userId)
                         analytics.logEvent("user_anonymous_login", bundle)
@@ -80,7 +141,6 @@ class MainActivity : AppCompatActivity() {
                 }
         } else {
             userId = auth.currentUser?.uid
-            Log.d("FIREBASE_AUTH", "User already signed in. UID: $userId")
         }
     }
 
@@ -88,14 +148,11 @@ class MainActivity : AppCompatActivity() {
         currentPhrase = getRandomPhrase()
         binding.txtFrase.text = currentPhrase
 
-        // Firebase Analytics event a) - User opens cookie and sees phrase
         val bundle = Bundle().apply {
             putString("phrase", currentPhrase)
             userId?.let { putString("user_id", it) }
         }
         analytics.logEvent("open_cookie", bundle)
-
-        Log.d("FIREBASE_ANALYTICS", "Event: open_cookie, Phrase: $currentPhrase")
     }
 
     private fun getRandomPhrase(): String {
@@ -126,15 +183,6 @@ class MainActivity : AppCompatActivity() {
         }
         startActivity(Intent.createChooser(intent, "Compartir frase"))
 
-        // Firebase Analytics event b) - User shares phrase
-        val bundle = Bundle().apply {
-            putString(FirebaseAnalytics.Param.METHOD, "share")
-            putString("phrase", currentPhrase)
-            userId?.let { putString("user_id", it) }
-        }
-        analytics.logEvent("share_phrase", bundle)
-
-        Log.d("FIREBASE_ANALYTICS", "Event: share_phrase, Phrase: $currentPhrase")
         Toast.makeText(this, "Frase compartida ✓", Toast.LENGTH_SHORT).show()
     }
 
@@ -143,15 +191,6 @@ class MainActivity : AppCompatActivity() {
         val clip = ClipData.newPlainText("Frase de la fortuna", currentPhrase)
         clipboard.setPrimaryClip(clip)
 
-        // Firebase Analytics event c) - User copies phrase to clipboard
-        val bundle = Bundle().apply {
-            putString(FirebaseAnalytics.Param.METHOD, "copy")
-            putString("phrase", currentPhrase)
-            userId?.let { putString("user_id", it) }
-        }
-        analytics.logEvent("copy_phrase", bundle)
-
-        Log.d("FIREBASE_ANALYTICS", "Event: copy_phrase, Phrase: $currentPhrase")
         Toast.makeText(this, "Frase copiada al portapapeles 📋", Toast.LENGTH_SHORT).show()
     }
 
@@ -162,12 +201,10 @@ class MainActivity : AppCompatActivity() {
             userId?.let { putString("user_id", it) }
         }
         analytics.logEvent(eventName, bundle)
-        Log.d("FIREBASE_ANALYTICS", "Event: $eventName, Description: $description")
     }
 
     override fun onResume() {
         super.onResume()
-        // Log app open event
         val bundle = Bundle().apply {
             putString("screen", "MainActivity")
             userId?.let { putString("user_id", it) }
